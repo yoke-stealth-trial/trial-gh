@@ -1,0 +1,116 @@
+# Frontier
+
+<!-- yoke:breadcrumbs -->
+[Getting started](../index.md) > [Command and technical reference](../guide/reference/index.md) > [Strategy](index.md) > Frontier
+<!-- /yoke:breadcrumbs -->
+
+The **Frontier** is what can run now, ranked with reasons. You steer; a
+harness executes.
+
+## Modes that move it
+
+| Command | Role |
+|---|---|
+| `/yoke charge` | Pick up the next runnable item and dispatch |
+| `/yoke feed` | Maintain dependency graph; optionally materialize ideas from strategy |
+
+## Read the board
+
+Frontier rows reflect lifecycle status, blocks, freezes, claims, and
+dependencies. Blocked items stay at their lifecycle stage with a reason;
+frontier routes them to wait until unblocked.
+
+An item with an unknown workflow stage or a skill without a frontier adapter
+is excluded from scheduling without stopping other items from listing.
+`frontier.list` returns it in `diagnostics`, with its public `item_id`,
+`reason` and `recovery`. Repair that item's workflow pin or stage before
+trying to dispatch it.
+
+The Frontier page draws six bands, in order: **Waiting**, **On hold**,
+**Ready**, **In progress**, **Release** and **Done (24h)**. Waiting is a graph of
+unsatisfied dependency edges at the start, merge and close gates
+(`coordination_only` edges never block, so they are never drawn). Its first
+column, *Holding work up*, holds every item with no unsatisfied blocker that
+something waits on, whatever its band; later columns are steps behind, by the
+longest unsatisfied path. The longest chain that can still move is drawn
+heavier. Each tile names what holds it — "Starts after <blocker> merges", "Can
+build now · lands after …", "Can't close until … is live on prod" — and its
+hover lists each edge's rationale. A tile that cannot move on its own is red
+with its reason: a frozen or blocked root others wait on, a cancelled
+blocker, an environment no delivery flow of the blocker reaches, or a
+deadlock (items waiting on each other in a loop). Deadlocks come from the
+server's one cycle detector, which `frontier.list` serves beside the edges as
+`dependency_cycles`; the page draws them rather than computing its own.
+Dependency writes refuse to close a loop, so one appears only when items move
+into it. Everything downstream reads `Stuck upstream: <item>`. Selecting a tile opens every blocker with its
+gate, condition, where it is now and its rationale, every dependent, and the
+item's full card. On a phone the graph is an outline of each chain.
+
+Committed work waiting only to land waits too: an item whose lane has a
+recorded commit and whose only unmet edges hold back its merge cannot do
+anything but wait; without a holder it sits in Waiting. Dependency tiles name
+the unmet gate and blockers. The steering report retains the server's next-action
+sentence; JSON and named-field item reads retain its next-actor projection.
+
+Each item has one server-assigned home section (`frontier_group`). On hold
+contains frozen work at any unfinished stage, along with blocked, missing-spec
+and halted work. It keeps that home
+when other items depend on it. In progress separates Working from Idle using
+the holder's shared server status. Session cards display awaiting intent when
+present. Reasons and next actor are available in the information disclosure. Dependency references in the graph are smaller outlined
+cards naming their home, activity when available and live claimant, with a link
+to their home card. Section
+counts exclude references. The project filter keeps whole dependency chains
+across projects, and session chips open the holder's session card.
+
+The graph reads `dependency_edges` from `frontier.list`. A serving build
+that predates that field gets a named refusal in Waiting and On hold, with
+its serving floor, rather than a graph guessed from reason text.
+
+
+Done (24h) shows finishes from the last 24 hours plus older blockers retained
+by live dependencies, with their actual finishing times. Its **See more...**
+link always opens Items in the current scope, including when the window is empty.
+
+Release, Done and frozen On hold cards show delivery by landing and environment. A
+candidate run appears while it carries a landing awaiting delivery there;
+the first successful run settles that landing in that environment. Later runs
+that only contain the same code remain in run history. Stage delivery does not
+settle Production delivery, and a new landing of the same item starts a new
+delivery. The card names the item's single flow once and shows one current
+row per environment. Once the item has merged, a sub-line under the flow
+header reads `merged <relative time> · PR <number>`; the PR links to its
+repository when known. Unmerged items have no merge sub-line. A `member`
+run owns the item's delivery; a `carried`
+run contains its code without owning its QA. Member outcomes use that member's
+own QA: a passed item reads `deployed · QA passed` even while its run stays
+open. Only that finished member gets a sub-line naming the run's remaining
+wait. In-progress rows name the current stage and elapsed time. An environment
+awaiting a run reads `Merged · not in <environment> yet · next release` only
+when that item's workflow delivery policy owes a delivery and the item is not
+cancelled. When an owed delivery has a flow and no run row for its completion
+environment, a frozen item reads `Frozen · releases don't deliver it`. A merged
+frozen item adds `· code merged; item QA paused`. Inheriting the project's
+default flow is not that obligation. A cancelled item, and a workflow
+whose delivery policy is `merge_free`, leave the delivery box off when nothing
+has been delivered. A delivery that did happen stays on the card, including
+after cancellation and on a workflow that does not owe one. The run id links
+to its history. Compact Frontier rows and dependency cards say each
+environment's state in one phrase, with the environment's own name:
+`✓ Live in prod`, `Deploying to prod`, `Merged · not in prod yet` or
+`✗ Failed in prod`. The compact frozen state reads `Frozen · releases don't deliver it`.
+
+```bash
+yoke items dependency list PREFIX-N
+```
+
+## Operator stance
+
+- Charge when you want motion on ready work
+- Feed when strategy or the dependency graph is stale
+- Do not delete required files from an item to clear a path-claim conflict —
+  coordinate or serialize instead
+
+Algorithm detail: [strategy/charge-frontier.md](charge-frontier.md).
+
+Ready cards show readiness and item context without a raw CLI command line.

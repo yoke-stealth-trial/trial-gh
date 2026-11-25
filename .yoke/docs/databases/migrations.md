@@ -1,0 +1,165 @@
+# Database migration conventions
+
+<!-- yoke:breadcrumbs -->
+[Getting started](../index.md) > [Command and technical reference](../guide/reference/index.md) > [Databases](index.md) > Migration conventions
+<!-- /yoke:breadcrumbs -->
+
+Use the timestamp, query-clock and migration-audit conventions when authoring or applying governed migrations.
+
+## Migration and schema layering
+
+Migrations and `*_schema.py` modules describe storage below live domain policy.
+Import core helpers only from the `schema_storage`, `persistence_queries` and
+`payload_validators` layers; the guard also explicitly lists migration
+infrastructure helpers. These are layer names in an explicit module allow-list,
+not Python packages or permission to import any module with a matching suffix.
+Standard-library modules, `psycopg` and `yoke_contracts` are also allowed.
+
+Take storage constants from the schema layer that owns their declaration.
+Do not import live orchestration, workflow gates or domain invariants to obtain
+a constant or perform a backfill. Keep live policy in orchestration and pass
+the required data into the migration or schema helper. Otherwise later policy
+changes can break historical migrations or make schema boot depend on services
+whose tables do not exist yet.
+
+The guard `runtime/api/domain/test_migration_import_layers.py` (Yoke source repo only)
+owns the allow-list and
+checks every domain `*_schema.py` and numbered migration after `0106`.
+It finds top-level and lazy imports, including relative and package-from forms.
+The entries through `0106` have been replaced by a code-declared baseline.
+The guard also rejects imports of migration modules from runtime code outside
+the history package, including dynamic `import_module` calls. Runtime behavior
+belongs to its domain owner; the guard has no live-policy exceptions.
+
+A violation names the source path, line, forbidden module and allowed layers,
+then directs the author to move live policy to orchestration and pass data in.
+Fix the dependency at its owner rather than disguising it with a lazy import
+or assuming a `_schema` or `_contract` suffix makes it allowed. Run this guard
+with the migration entry tests before submitting a migration change.
+
+## Applied history is immutable
+
+Never edit an applied migration, including its imports: the ledger records its
+raw-byte digest. Correct an old invariant with a new ordered entry. Historical
+scripts through ordinal 0106 have been replaced by the code-declared
+`0106_baseline`. All known ledgers have converged; boot no longer replaces
+predecessor membership. New databases stamp only the baseline, recording its
+serving floor. Existing databases must already hold baseline membership;
+a missing baseline refuses boot and requires restoring the database with its
+matching release. Subsequent scripts retain their immutable bytes and ordered
+application. Remove dedicated tests with retired scripts and retain shared
+replay and baseline contracts.
+
+Rehearsal and merge history checks compare repository content through Git's
+clean filters. A `core.autocrlf=true` checkout can therefore carry CRLF without
+changing its integration identity; Git attributes such as `-text` still preserve
+byte differences. This comparison does not change the ledger's raw-byte digest.
+
+After a ledger collapses, rollback below the carrying release is unsupported.
+Recovery pairs a database restore point with its matching older release, or
+proceeds forward. Portable archives must match the current trusted schema;
+the importer does not reconstruct retired tables, column names or QA snapshots.
+
+## Timestamp discipline
+
+PostgreSQL instant columns use `TIMESTAMPTZ`; Python retains aware datetimes.
+Nullable instants use SQL NULL. The classified roster and serving catalog own
+storage declarations; permanent history owns governed conversion.
+
+Application writers bind `instant_parameter(conn, utc_now())` or a supplied
+`parse_instant(value)`. Owned wire, JSON, file and SQLite values use canonical
+UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ` and permitted nulls. Format with
+`format_instant` or the shared JSON encoder at those boundaries. Calendar dates
+and opaque strings keep their own contracts. Read [domain instants](../runtime/time/encoding.md)
+for the shared kernel, strict input, historical conversion and wire recipes.
+
+## Query-Time SQL Clock Helpers
+
+`yoke_contracts.time_sql.now_sql(...)` supplies native indexed predicates;
+fixed day/hour/minute offsets count elapsed seconds. Trusted `offset_modifier`
+SQL has caller-owned calendar meaning; board buckets declare their timezone.
+Python cutoffs bind through `instant_parameter`. `instant_wire_sql(expression)`
+projects canonical fixed-six UTC text after native filtering and ordering,
+preserving SQL NULL. See [domain instants](../runtime/time/encoding.md) for query examples.
+
+## `migration_model` capability — recipe + runner vocabulary
+
+Validation recipes and migration runners live behind the `migration_model`
+row, each model's release fleet behind the `migration_fleet` row: vocabulary,
+pairing matrix, and webapp Pack contract in
+[model declaration and runner](migration-model.md) and
+[audit, pairing and Webapp Packs](migration-model-pairing.md);
+the fleet in [migration fleets](migration-fleet.md).
+
+## Live-apply provenance on `migration_audit`
+
+A destructive apply refuses rather than writing nulls: session, actor, branch,
+and commit must be established first, and the receipt records them. Legacy
+null rows stay as incident evidence and are not backfilled. `model_name` is a
+declared migration model; an execution level in that column is refused.
+
+A bounded maintenance helper with its own safety model records a completed
+audit row through `record_audit_fingerprint` instead of a history entry. Each
+such call site needs a decision record at `docs/archive/decisions/<name>.md`,
+and a call without a backup carries an `exception_reason`;
+`HC-oneshot-migration-coverage` reports a call site without its record.
+
+The extra provenance columns below remain nullable so older rows stay
+readable. `set_audit_provenance` still skips unknown columns on a
+pre-migration authoritative DB.
+
+```sql
+actor_id          TEXT  -- harness_sessions.actor_id at apply time
+worktree          TEXT  -- absolute worktree_path the apply ran from
+source_branch    TEXT  -- git branch in that worktree (--show-current)
+source_commit    TEXT  -- git HEAD sha in that worktree
+integration_target TEXT -- typically 'main'
+change_class      TEXT  -- profile.migration_strategy (additive_only, hard_cutover, expand_contract)
+```
+
+The `migration_audit.lease_id` join already linked the audit row to the coordination claim that protected it; the new columns answer "from which checkout, by which actor, against which integration target." Doctor's `coordination-claims-unmerged-source` HC uses `source_branch` + `integration_target` to flag completed rows whose source never reached integration target — a sign the worktree was deleted before the slice merged.
+
+## Applying a migration
+
+There is no apply command. A server brings its own database up to the code it
+runs before it serves: `converge_core_schema` computes `history - ledger`,
+takes an exclusive per-database advisory lock, and applies each pending entry
+in order, committing the entry and its raw-byte SHA256 in the
+`applied_migrations` row in ONE transaction. A common non-NULL digest mismatch
+refuses before restore or mutation. Legacy NULL rows remain serviceable but are
+reported for explicit manifest-bound adoption; the mandatory prepare/verify/
+apply procedure lives in
+[migration-model.md](migration-model.md).
+`/v1/health` reports `migration_content_evidence_ready` and refuses serving
+when the evidence schema or exact append-only guard behavior is not intact;
+container/deploy readiness also requires the adoption-required list to be empty.
+Boot is fail-hard, so a container never serves behind its schema or against
+known mismatched permanent migration bytes.
+
+A work item authors the entry and rehearses it:
+
+```bash
+yoke --env <name> migration rehearse PREFIX-N
+```
+
+Rehearsal applies the entry to the validation surface, records the gate's
+receipt in `migration_audit` on the control plane that holds the item, and
+holds the `LIVE_DB_MIGRATION:<model>` coordination claim until the merge lands so
+a second item cannot enter migration territory meanwhile; failure releases it.
+
+## Breakage policy and migration strategy
+
+`projects.breakage_policy` is `founder_cutover` (default) or
+`compatibility_required`. A DB claim declares `migration_strategy`
+(`additive_only`, `hard_cutover`, `expand_contract`); the gates combine them:
+
+| Policy | Strategy | Result |
+|---|---|---|
+| any | `additive_only` | allowed |
+| `founder_cutover` | `hard_cutover` | allowed for `pre_merge_safe` or `pre_merge_breaking` |
+| `founder_cutover` | `expand_contract` | needs `migration_strategy_justification` |
+| `compatibility_required` | `hard_cutover` | needs `migration_strategy_justification` |
+
+## Related
+
+- [Reference](reference.md)
