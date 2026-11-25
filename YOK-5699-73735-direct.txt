@@ -1,0 +1,1 @@
+Managed macOS fast-forward push control for YOK-5699.
