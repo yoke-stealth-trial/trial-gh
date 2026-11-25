@@ -1,0 +1,10 @@
+{
+  "networkPolicy": {
+    "allow": [
+      "api.github.com",
+      "app.stage.upyoke.com",
+      "github.com"
+    ],
+    "default": "deny"
+  }
+}

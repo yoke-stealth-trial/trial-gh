@@ -1,0 +1,68 @@
+# Board header art — read by the Yoke board renderer on every rebuild.
+# Render tuning (bucket weights, frontier window) lives in project-policy.settings.board;
+# to pin a variant, set art_override there (e.g. frontier, rainbow_letters,
+# ascii_1, mixed_1).
+#
+# Sections:
+#   ## Master Map  -- emoji grid of ⬜ (fill target) and ⬛ (structural) cells;
+#                     drives the frontier progress fill and rainbow modes.
+#   ## Emoji       -- hand-drawn standalone emoji grids, rendered verbatim.
+#   ## ASCII       -- raw monospace text art (no dimension constraints).
+#   ## Mixed       -- text + emoji, pasted like ASCII art.
+#
+# A "# weight:N" line immediately above a section header weights that variant
+# within its bucket; once any variant in a bucket carries a weight, unweighted
+# variants in that bucket fall to 0. "# weight-disabled:N" is ignored (parked).
+
+## Master Map
+
+⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+⬛⬛⬜⬜⬜⬜⬜⬛⬛⬜⬜⬜⬜⬜⬜⬜⬛⬜⬜⬜⬜⬜⬜⬜⬛
+⬛⬜⬜⬛⬛⬛⬜⬜⬛⬜⬜⬜⬜⬜⬜⬜⬛⬜⬜⬜⬜⬜⬜⬜⬛
+⬛⬜⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬛⬛
+⬛⬜⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬛⬛
+⬛⬜⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬛⬛
+⬛⬛⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬜⬜⬜⬜⬛
+⬛⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬜⬜⬜⬜⬛
+⬛⬛⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬜⬜⬛
+⬛⬛⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬜⬜⬛
+⬛⬛⬛⬛⬛⬛⬜⬜⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬜⬜⬛
+⬛⬜⬜⬛⬛⬛⬜⬜⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬛⬛⬛⬜⬜⬛
+⬛⬛⬜⬜⬜⬜⬜⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛⬜⬜⬜⬜⬜⬜⬜⬛
+⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+
+## ASCII
+
+ #### #####   ###
+#   # # # #  #  #
+#       #   #
+ ###    #   #  ###
+    #   #   #   #
+#   #   #    #  #
+####   ###    ###
+
+## Emoji
+
+⬛⬛⬛⬛⬛🟨⬛⬛⬛⬛⬛
+⬛⬛⬛⬛⬛🟨⬛⬛⬛⬛⬛
+⬛⬛⬛⬛🟨🟨🟨⬛⬛⬛⬛
+🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
+⬛🟨🟨🟨🟨🟨🟨🟨🟨🟨⬛
+⬛⬛🟨🟨🟨🟨🟨🟨🟨⬛⬛
+⬛⬛🟨🟨🟨⬛🟨🟨🟨⬛⬛
+⬛🟨🟨⬛⬛⬛⬛⬛🟨🟨⬛
+🟨🟨⬛⬛⬛⬛⬛⬛⬛🟨🟨
+
+## Mixed
+
+ .----------------.  .----------------.  .----------------.   
+| .--------------. || .--------------. || .--------------. |  ⬜⬛⬛🟩⬛🟩🟩⬛⬜⬜⬜⬜⬜⬜
+| |    _______   | || |  _________   | || |    ______    | |  ⬜⬜⬛🟩⬛⬛⬛🟩⬛⬛⬛⬛⬜⬜
+| |   /  ___  |  | || | |  _   _  |  | || |  .' ___  |   | |  ⬜⬜⬜⬛🟩⬛⬜⬛🟥🟥🟥🟥⬛⬜
+| |  |  (__ \_|  | || | |_/ | | \_|  | || | / .'   \_|   | |  ⬜⬜⬜⬛⬛🟩⬛🟥🟥🟥🟥🟥🟥⬛
+| |   '.___`-.   | || |     | |      | || | | |    ____  | |  ⬜⬜⬛🟥🟥🟥🟥⬛🟥🟥🟥⬜🟥⬛
+| |  |`\____) |  | || |    _| |_     | || | \ `.___]  _| | |  ⬜⬛🟥🟥🟥🟥🟥🟥⬛🟥🟥🟥🟥⬛
+| |  |_______.'  | || |   |_____|    | || |  `._____.'   | |  ⬜⬛🟥🟥🟥⬜🟥🟥⬛⬛⬛⬛⬛⬜
+| |              | || |              | || |              | |  ⬜⬜⬛🟥🟥🟥🟥⬛⬜⬜⬜⬜⬜⬜
+| '--------------' || '--------------' || '--------------' |  
+ '----------------'  '----------------'  '----------------'

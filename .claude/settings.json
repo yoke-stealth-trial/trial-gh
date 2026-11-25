@@ -1,0 +1,100 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate PermissionRequest'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate PostToolUse'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate PostToolUseFailure'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate PreToolUse'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate SessionEnd'",
+            "type": "command",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate SessionStart'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate Stop'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; env YOKE_ROOT=\"${CLAUDE_PROJECT_DIR:-$PWD}\" YOKE_HOOK_CONFIG_OWNER=claude yoke hook evaluate UserPromptSubmit'",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit(**)",
+      "Read",
+      "Grep",
+      "Glob",
+      "Monitor"
+    ]
+  },
+  "autoMemoryEnabled": false,
+  "statusLine": {
+    "type": "command",
+    "command": "/bin/sh -c 'PATH=\"${XDG_BIN_HOME:-$HOME/.local/bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}\"; export PATH; yoke hook status-line'"
+  }
+}

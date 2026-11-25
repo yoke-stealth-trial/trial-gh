@@ -1,0 +1,72 @@
+# Steer — batch delivery
+
+Create runs through the connection owning the project.
+
+Resolve the intended full commit once and verify its CI passed. Create the
+project's release set in one command: one flow per environment, and drive
+every run. Respect any declared QA gate before creating a flow that it must
+precede.
+
+```sh
+PINNED_SHA=$(git -C "$CHECKOUT" rev-parse HEAD)
+yoke --env CONTROL_PLANE deployment-runs create PROJECT FLOW_A FLOW_B --project-repo-path "$CHECKOUT" --source-ref "$PINNED_SHA" --idempotency-key RELEASE_KEY
+yoke --env CONTROL_PLANE watch deploy -- RUN_ID
+```
+
+Every run records that commit and key `RELEASE_KEY:FLOW`. A refusal cancels
+runs already made by the call. A correction needs a new set on its passing
+commit; earlier proof does not cover it. For tip binding, see
+`.yoke/docs/deployments/cutting-runs.md#create-a-release-set`.
+
+Cut while member QA runs; keep the execution ID (`.yoke/docs/deployments/takeover.md`).
+Open walks carry intact to the successor; never hold a release for an open walk.
+The create receipt's `carried_execution_ids` names each carried execution.
+
+Release enrollment skips frozen items. Use `remove-item` only when an item
+already attached to a live run must leave before takeover. An existing operator
+park still applies after thaw until the item lands again or is explicitly added.
+
+CONTROL_PLANE is the project-owning HTTPS connection (`--env`, or checkout routing);
+DB env refuses run creation with `use_https_env`. Both targets use the selected
+source `release_lineage`. A self-replacing run uses the paired `*-db-admin`
+driver: `stage-db-admin` for Stage ownership, `prod-db-admin` for Production. Retry lost creates with the same key; re-drive with
+`watch deploy`. Migrations: `.yoke/docs/databases/index.md`.
+
+## Member QA
+
+The owner runs member QA (its post-deploy item cases) and keeps its claim.
+The driver logs `Still waiting for scoped QA` per minute, exits 5 at timeout,
+then re-drives; longer silence is stuck. A recognised scoped-QA hold makes
+`watch deploy` exit 0 and report `outcome: waiting` with `child_exit=5`.
+Stop with `yoke qa plan abort`, never kill the runner.
+
+```text
+yoke watch qa-plan -- --item PREFIX-N --stage STAGE --project {_project}
+```
+
+Failed QA: `.yoke/docs/verification/failed-item-qa.md`.
+
+### Manual-wake member QA
+
+Manual QA evidence selection and scheduled rechecks are by design. Evidence not
+available yet: the owner parks only behind its own `yoke sessions wake schedule`
+recheck, so a takeover does not wake it. A missing automatic notice, resume or
+required recheck is a defect: root-cause it with a subagent and file feedback
+before manual recovery; label that recovery a workaround. Then staff missing
+owners, use `yoke qa plan reconcile` for ownerless walks, or ask an owner parked
+without a required recheck to schedule it.
+
+Driver runs run-scoped QA:
+
+```text
+yoke watch qa-plan -- --deployment-run-id {RUN_ID} --stage STAGE --project {_project}
+```
+
+## Orphans
+
+Finish only an orphan handed here; never `--skip-deploy`:
+
+```text
+yoke claims work acquire --item PREFIX-N --reason "orphaned release-wait member"
+yoke merge item PREFIX-N --result "what shipped" --verification "run evidence"
+```
