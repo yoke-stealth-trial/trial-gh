@@ -1,0 +1,312 @@
+# Standalone Project QA Plans
+
+<!-- yoke:breadcrumbs -->
+[Getting started](../index.md) > [Command and technical reference](../guide/reference/index.md) > [Verification](index.md) > Standalone plans
+<!-- /yoke:breadcrumbs -->
+
+Run a saved plan immediately without an item or deployment run:
+
+```text
+yoke qa plan run --plan PLAN --project P
+```
+
+Each fresh run freezes cases and host baselines in saved order in existing QA
+execution, requirement, run, review, and artifact records. Its standalone execution
+owns the evidence and changes no item transition, delivery acceptance, or stage gate.
+An interrupted live run resumes its immutable roster and cursor in its owning session.
+Latest-execution reads select the unique live owner first, then the greatest
+database-assigned execution order. Requirement creation, timestamp precision,
+and random execution ids do not determine that order. The identity column is
+added on boot to existing databases; historical rows receive an order at that
+convergence, which cannot recover their original same-second creation order.
+Unsupported runners or missing capabilities refuse before any case executes.
+
+Commands require `--checkout-path PATH --expected-sha FULL_SHA`: the checkout
+must be clean at that commit. CI cases require the SHA and `--expected-branch REF`,
+a published branch or tag at that commit, and a case-declared `ci_workflow`.
+They dispatch with declared `ci_workflow_inputs`, verify the run's actual commit,
+and record its URL and conclusion. Manual CI does not publish, rebase, or open a
+landing PR, including on merge-queue projects.
+
+Browser, terminal, machine-state, inspection, and exploratory cases retain their
+target, capability, serial lease, evidence, and review contracts.
+Read proof with `yoke qa plan get PLAN --project P --full`, then inspect returned
+requirement and run ids through QA reads. Abort with
+`yoke qa plan abort --project P --execution-id ID --reason TEXT`.
+An in-flight host abort retains custody until the runner records case cleanup;
+including restoration to its chain's baseline. Follow
+[safe host cancellation](deployment-plan-execution.md#stop-host-work-safely)
+when it returns `qa_abort_restore_pending`.
+`--continue-mission` resumes a stale-settled mission with its unchanged plan snapshot
+and preserved host state. Continuation commands omit `--test-machine`; the scheduler
+keeps simultaneous cases on their declared driver and full host set. For
+single-host cases it recovers each platform’s original host from durable leases and runs, and selects
+a fresh eligible host only for a platform not used before. Read `yoke qa plan run --help` for
+the complete requirements.
+
+## Function protocol
+
+Source-generated plans record their exporter commit with
+`yoke qa plan-cases sync --project P --plan-id N --cases-file SOURCE_EXPORT`.
+The commit must be on the project's verified default branch. A source-bound
+plan whose cases the Yoke build itself generates also converges when a server
+running that build boots, moving forward to the build commit; every other
+source-bound plan moves only through sync. Once bound, a plan
+requires provenance on every replacement and refuses the interactive editor;
+manual one-off correction plans remain separate. Source sync against a serving
+build without this field refuses before writing and names the required release.
+Frozen deployment snapshots retain source provenance. A stage materializes its
+frozen definitions even after the saved plan changes; a selected or refreshed
+source not carried by the run's candidate refuses `qa_plan_source_candidate_mismatch`.
+Release a candidate carrying the newer source, or use a run-bound correction.
+A plan the run froze while unbound keeps its frozen cases for that run after a
+later sync binds it; its stages, retraction and retirement proceed. A snapshot
+with no source field at all refuses `qa_plan_source_snapshot_missing`.
+A sync moves only forward: its revision must equal or descend from the plan's
+recorded revision. An older revision refuses `qa_plan_source_revision_regression`
+and an unprovable recorded revision refuses `qa_plan_source_ancestry_unverified`;
+both name the two revisions and write nothing. Export from current main and sync again.
+
+Standalone project QA uses `qa.plan_execution.begin` with a project-scoped
+`global` target and payload `plan`, optional `source_revision`, `source_ref`,
+`checkout_path`, `test_machine`, and `continue_mission`. Adapter:
+`yoke qa plan run --plan PLAN --project P`; read its `--help` for source bindings.
+State, heartbeat, advance, complete, abort, review, and machine/mission calls
+retain that target and verify the execution's project and actor/session.
+Responses carry `standalone_plan_id`; snapshots and proof reads carry
+`standalone_execution_id`. Requirement-targeted recording verifies the same
+owner, and browser context accepts a standalone `qa_requirement` target.
+Standalone execution uses existing QA records and never credits item or deployment gates.
+
+## Case environment obligations
+
+Every case is [self-contained](case-attachment.md#self-contained-cases): it
+never relies on the runner's seat, claim or session.
+
+
+A case can declare `"target_envs": ["prod"]` in the JSON supplied to
+`yoke qa plan-cases replace` or `yoke qa plan edit`. These are unique registered
+environment names on the plan's project, each with a reviewable URL. Use `[]`
+to keep the plan's default target. `qa plan edit` puts every case field in its
+document, `target_envs` and `stage_reason` included; a save that leaves out a
+field of an existing case and would reset its stored value is refused as
+`qa_plan_edit_unedited_field_changed`, naming each case and field. `qa plan-cases replace`
+refuses a key that is not a plan case field, such as `blocking_mode`, as
+`qa_plan_case_field_unknown`, naming each case and key; blocking mode belongs
+to a materialized requirement (`yoke qa requirement update`).
+
+`stage_reason` is optional descriptive metadata. It accepts
+`creates_or_destroys_data` or `changes_infrastructure`; an unknown value
+refuses as `stage_reason_invalid`. Target resolution uses `target_envs`
+independently of this metadata.
+
+A case runs against each environment in `target_envs`, or the plan's bound
+environment when the list is empty. Any Yoke endpoint or environment name the
+case pins must belong to that target. Writing the cases, attaching the plan to
+an item (`yoke qa item-plan attach`) and setting it as a project default all
+refuse a case that names another environment's endpoint as
+`case_target_mismatch`, naming the plan, case and environment. Name only that
+environment's endpoints, or list the environment the endpoint belongs to in
+`target_envs`. A plan with no bound environment has no default endpoints to
+check. If a stored requirement still fails this check when it runs, the
+refusal names the requirement, its case, its item and any deployment run.
+
+The control plane records QA against environments the plan project owns or
+is authorized to use through a same-organization hosted-runtime bridge.
+Execution rechecks the frozen environment's registered identity; cross-org
+targets refuse. A declared `qa.identity_path` is read from the owning
+environment by ID, using its registered origin. Begin, owner resume and
+result writes observe the full served SHA; heartbeats and host operations
+recheck only the target's authorization. Results store `served_build_sha` and
+`served_build_status`; environments without a path record `no_declared_path`.
+An unreadable answer refuses as `served_build_unobservable`. After a
+redeploy, the owner's resume of an execution that has run no case rebinds it
+to the new build in place, so it keeps its queue position and host
+reservation. Once cases have run, resume and result writes refuse as
+`served_build_changed`, naming both SHAs and the owner's
+`yoke qa plan abort --execution-id ID --reason TEXT`; run the plan again after
+it and the session keeps its host turn as a hold-over. An execution whose
+every case runs on a Test Machine keeps walking across a redeploy: its owner
+resumes it without a build check, and each result records
+`served_build_changed` with the new SHA and keeps both SHAs under
+`served_build_changed` in the run's `raw_result`.
+Deployment and project targets retain their own identity proofs.
+
+
+Item materialization creates one requirement per environment and host baseline,
+with `target_env` and an immutable execution target on each row. Rematerializing
+keeps matching case key, baseline, and environment identities, and waives only
+variants removed from the definition. Deployment stages materialize only cases
+applicable to their own target; evidence from Production cannot prove Stage.
+
+Attach delivery cases at the workflow's release transition with
+`--qa-phase post_deploy`, then materialize them before release composition so
+Stage-targeted obligations enroll the item on a matching supplemental run.
+The item stays at its release wait until every blocking target is accepted.
+`missing_target_proof` names the missing environment and matching active flows;
+if no flow can carry it, configure an item QA stage for that environment and
+deliver the same candidate through it. Use target-relative commands such as
+`BASE_URL` rather than hardcoded Stage or Production endpoints in shared cases.
+
+A standalone execution has one immutable target. A plan requiring other
+environments refuses with `qa_plan_requires_environment_scopes` before writing
+cases. Use each item requirement or matching deployment QA stage to collect
+those separate proofs; a standalone plan run never completes an item gate.
+## Cases that wait for real traffic
+
+Some checks can only be judged once real production traffic has happened after
+a deploy, such as "a real failed direct wake that a relay then claimed". Run at
+stage entry, they fail or prove nothing. Give such a case
+`"wake_path": "manual"` and a one-line `wake_evidence`:
+
+```json
+{"case_key": "relay-claim-observation", "method_id": "exploratory-mission", "wake_path": "manual", "wake_evidence": "a session wake that failed directly and a relay then claimed exists after this release"}
+```
+
+| `wake_path` | Starts |
+|---|---|
+| `automatic` (default) | When its stage begins: the stage driver wakes the member's owner |
+| `manual` | Once its owner confirms `wake_evidence`: the stage driver wakes the owner to check it |
+
+Write `wake_evidence` as the evidence itself, as something a registered read
+can confirm (`yoke deployment-runs get`, `yoke db read`, `yoke qa requirement
+list`), not as a time or a hope. Method, runner and verdict path are
+unchanged, and the case stays open across release takeovers until evidence settles it.
+`manual` without evidence refuses `wake_evidence_required`; evidence on an
+automatic case refuses `wake_evidence_without_manual_wake`; an unknown path
+refuses `wake_path_invalid`; more than one line or 300 characters refuses
+`wake_evidence_not_one_line`.
+
+While one of a member's manual cases is open, the stage driver sends its
+owner one notice per open manual case instead of the ordinary stage wake,
+because one stage execution runs the member's whole roster. The notice names
+the evidence: check it with a registered read, run the member's cases if it
+exists. Evidence not available on this release yet: stay parked; the case
+waits for a real change or a timed recheck. A parked holder is woken; a member with no live holder
+reaches the project's steering seat. The steering fleet report lists each open
+one under "waiting on manual wake" with its run, item, requirement, case,
+evidence, owner (with its next scheduled recheck, or `no recheck scheduled`)
+and run command. To mark an already materialized requirement,
+set the evidence first, then the path:
+
+```text
+yoke qa requirement update --requirement-id N --field wake_evidence --value '<evidence>'
+yoke qa requirement update --requirement-id N --field wake_path --value manual
+```
+
+The write reaches only that row. Correct the plan case as well, so later
+materializations carry it.
+
+
+
+## Failed cases and independent missions
+
+A standalone run records every independent chain before it settles. When a
+case fails and an independent exploratory mission chain prepared cleanly, the
+run still enters `walking` for that mission and returns the review bundle
+(exit code `12`). The failed case keeps its recorded outcome and is not in the
+bundle; cases chained behind it stay blocked (`chain_blocked`). Submitting the
+review settles the execution as failed, with release reason
+`qa-plan-case-failed: requirements ...`. Without a prepared mission, or when
+review cannot begin, the failed run closes immediately with that reason; a
+review refusal is quoted in the run's `recovery`.
+
+A standalone mission belongs to its execution, so
+`yoke qa case run --requirement-id ID` refuses `qa_single_mission_standalone`.
+It names `--resume-execution-id` while that execution is live; once it has
+ended, start a fresh execution with `yoke qa plan run --plan PLAN --project P`.
+
+## Recover a lost check-in response
+
+```text
+yoke qa plan run --plan PLAN --project P --resume-execution-id EXECUTION_ID
+```
+
+Keep the original source and machine arguments. A response timeout leaves the
+action's outcome unknown: it does not cancel a server success. The check-in
+retries once with its exact request id, allowing the existing request ledger
+to replay a late success. It returns only cursor, target/roster identity,
+custody and liveness timing; it does not rebuild a full resume response.
+
+If communication stays unavailable, `outcome_unknown` names the execution,
+phase, request, attempts and saved request evidence. A confirmed pause keeps
+its cursor, results and machine leases; it does not renew them. When the pause
+cannot be confirmed, preserve the command capture and last known custody.
+Park the owning session with `yoke sessions touch --mode parked --reason
+"QA communication pause"` while restoring communication. When a pause was
+unconfirmed, add the returned `--recovery-file PATH` to exact-ID re-entry: it
+reapplies only that saved pre-case check-in pause. A consumed receipt or changed
+cursor refuses; inspect the current outcome instead of reusing an old receipt.
+
+Exact-ID re-entry validates the actor/session, subject, frozen source/target
+and live host custody before another case can start. Completed cases stay
+recorded. A lost heartbeat during cleanup stays in the capture and does not
+block case result submission. If submission also loses its response,
+`outcome_unknown` preserves that request and its result payload for inspection.
+An unadvanced action or recording outcome refuses automatic re-entry: keep
+the saved result and request evidence and ask the control-plane operator to
+inspect the durable cursor. No command replays an unrecorded case submission.
+Lost custody, permission refusals and terminal executions refuse with recovery.
+Never reset a host, spend another one-shot approval, or create a fresh campaign
+to repair a lost reply. Actual case failures and intentional aborts keep their own outcomes.
+Pause/resume needs a serving release carrying `qa.plan_execution.pause` and
+`qa.plan_execution.resume`; a serving-floor refusal names the control-plane
+operator who must supply it. Older heartbeat responses may contain a full
+resume contract; the client needs only the accepted check-in receipt.
+
+## Retire a plan
+
+```text
+yoke qa plan retire PLAN --project P --reason "why the plan is retired"
+```
+
+Retire a plan when it should stop answering new work: its cases are wrong or
+unrunnable and no item still needs it. Run the command from a session holding
+a live steering seat covering the plan's project; any other caller refuses with
+`steering_seat_required` and the seat recipe. `PLAN` is the slug or numeric id.
+
+Retirement records `retired_at`, the reason and the acting actor on the plan.
+The plan stays readable: `yoke qa plan get PLAN --project P` shows the
+retirement (a case whose recorded correction history is broken shows outcome
+`replacement_graph_invalid` with its named repair, retired or not), and
+`yoke qa plan list --project P --include-retired` lists retired
+plans beside active ones. Recorded requirements, runs and reviews keep their
+evidence. From then on the plan refuses edits and materialization. There is no
+un-retire; author a corrected plan with `yoke qa plan create`.
+
+While anything still depends on the plan, retirement refuses with
+`qa_plan_retire_dependents` and names each dependent with the command that
+settles it:
+
+| Dependent | Settle it with |
+|---|---|
+| Unsettled item requirement, not yet executed | `yoke qa item-plan retract` |
+| Unsettled requirement with a failed or missing latest attempt | `yoke qa requirement waive` or `supersede` |
+| In-flight execution whose roster reaches the plan | let it finish, or `yoke qa plan abort` |
+| Project default that attaches the plan to new items | `yoke qa project-default unset` |
+
+A requirement whose newest attempt passed does not hold the plan, and neither
+does a copy on a finished item: nothing can run it again, and a finished item
+cannot be claimed to retract it. Retirement retracts those unexecuted copies,
+and the attachment behind them, in the same transaction with the rationale
+`QA plan retired: <reason>`, and returns their ids in
+`retracted_requirement_ids`. Executed copies stay as recorded history. Repeating
+retirement on a retired plan returns the recorded retirement unchanged with
+`already_retired: true`, so a retry after a lost reply is safe. The command
+needs a serving release carrying `qa.plan.retire`; an older server refuses with
+the serving floor named.
+
+## Related
+
+- [Verification](index.md)
+- [QA platform](platform.md)
+
+For evidence that depends on time or traffic, the holder schedules its own recheck:
+`yoke sessions wake schedule --at 2026-12-01T12:00:00Z --reason "check the required traffic evidence"`.
+Choose whenever the evidence could plausibly exist (a date for time-based evidence,
+a sensible interval for event-based evidence), and schedule the next one after every
+recheck that still finds none; the holder cannot park without one. The durable wake
+uses the same manifest-qualified relay as other messages. A release takeover moves
+the requirement and its QA without sending this notice again, and sends no
+takeover notice to a manual-only holder that holds a scheduled recheck; changed
+evidence or a new holder gets a fresh notice.
